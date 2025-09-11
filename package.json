@@ -1,0 +1,36 @@
+{
+  "name": "mcp-server-node",
+  "version": "1.0.0",
+  "description": "MCP Server with Express and TypeScript",
+  "main": "dist/mcp-server.js",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/mcp-server.js",
+    "dev": "tsx watch src/mcp-server.ts",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "test": "node test/test-streamable-http.js",
+    "test:mcp": "node test/test-docker-mcp.js",
+    "test:auth": "node test/test-auth.js",
+    "test:client": "node test/test-client.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.0.0",
+    "node-fetch": "^3.3.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
