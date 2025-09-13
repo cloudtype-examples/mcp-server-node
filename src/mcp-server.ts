@@ -35,8 +35,8 @@ const extractBearerToken = (authHeader?: string): string | undefined => {
 // Create MCP server function
 const createMcpServer = () => {
   const server = new McpServer({
-    name: "MCP Server Example",
-    version: "1.0.0",
+    name: "MCP Server",
+    version: "0.0.0",
   }, {
     capabilities: {
       tools: {},
