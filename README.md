@@ -29,9 +29,9 @@ docker run -p 3000:3000 -e TOKEN=your_token mcp-server
 
 ## API
 
-- **POST** `/mcp` - JSON-RPC 2.0 MCP 요청
-- **GET** `/mcp` - SSE 스트림 (세션 ID 필요)
-- **DELETE** `/mcp` - 세션 종료
+- **POST** `/mcp`
+- **GET** `/mcp`
+- **DELETE** `/mcp`
 
 ### Tools
 - `create_task(title, description?)` - 작업 생성
