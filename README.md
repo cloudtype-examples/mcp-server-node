@@ -13,33 +13,32 @@ npm start
 TOKEN=your_token npm start
 ```
 
-## 테스트
+## 환경 변수
 
-```bash
-npm test              # 기본 테스트
-npm run test:mcp      # MCP 기능 테스트
+- **TOKEN** : 인증 토큰 (필수)
+
+## 접속 및 인증
+### 접속 주소 (로컬)
+```
+http://localhost:3000/mcp
 ```
 
-## Docker
-
-```bash
-docker build -t mcp-server .
-docker run -p 3000:3000 -e TOKEN=your_token mcp-server
+### 접속 주소 (서버 배포)
+```
+https://<도메인>/mcp
 ```
 
-## API
+### 헤더 (인증)
+HTTP 요청시 헤더에 `Authorization` 를 아래와 같이 설정
 
-- **POST** `/mcp`
-- **GET** `/mcp`
-- **DELETE** `/mcp`
+```
+Authorization: Bearer <TOKEN>
+```
 
-### Tools
-- `create_task(title, description?)` - 작업 생성
-- `complete_task(task_id)` - 작업 완료
-- `list_tasks()` - 작업 목록
-- `health_check()` - 서버 상태
-
-### Resources
-- `tasks://all` - 모든 작업
-- `tasks://pending` - 대기 작업
-- `tasks://completed` - 완료 작업
+## Tools
+- `user_list` - 사용자 목록 조회
+- `user_statistics` - 사용자 지표 조회
+- `calculator` - 계산기 예제
+- `list_tasks` - 작업 목록
+- `create_task` - 작업 생성
+- `complete_task` - 작업 완료

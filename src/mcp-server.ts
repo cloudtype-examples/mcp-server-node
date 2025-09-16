@@ -2,18 +2,10 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
-import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { Task, HealthCheckResponse } from "./types.js";
-
-// Sample data store
-const tasksDb: Map<number, Task> = new Map([
-  [1, { id: 1, title: "Setup MCP", completed: true, created_at: "2024-01-01T10:00:00" }],
-  [2, { id: 2, title: "Write documentation", completed: false, created_at: "2024-01-01T11:00:00" }],
-  [3, { id: 3, title: "Deploy to production", completed: false, created_at: "2024-01-01T12:00:00" }],
-]);
+import { isInitializeRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { tools } from './tools/index.js';
 
 // Auth helpers
 const REQUIRED_TOKEN = process.env.TOKEN;
@@ -34,150 +26,26 @@ const extractBearerToken = (authHeader?: string): string | undefined => {
 
 // Create MCP server function
 const createMcpServer = () => {
-  const server = new McpServer({
-    name: "MCP Server",
-    version: "0.0.0",
-  }, {
-    capabilities: {
-      tools: {},
-      resources: {},
-      prompts: {},
+  const server = new McpServer(
+    {
+      name: 'MCP Server',
+      version: '0.0.0'
     },
-  });
-
-  // Register create_task tool
-  server.tool('create_task', 'Create a new task', {
-    title: z.string().describe('Task title'),
-    description: z.string().optional().describe('Task description'),
-  }, async ({ title, description = "" }) => {
-    const taskId = tasksDb.size > 0 ? Math.max(...tasksDb.keys()) + 1 : 1;
-    const newTask: Task = {
-      id: taskId,
-      title,
-      description,
-      completed: false,
-      created_at: new Date().toISOString(),
-    };
-    
-    tasksDb.set(taskId, newTask);
-    return {
-      content: [{ type: "text", text: JSON.stringify(newTask, null, 2) }],
-    };
-  });
-
-  // Register complete_task tool
-  server.tool('complete_task', 'Mark a task as completed', {
-    task_id: z.number().describe('Task ID to complete'),
-  }, async ({ task_id }) => {
-    const task = tasksDb.get(task_id);
-    if (!task) {
-      throw new Error(`Task ${task_id} not found`);
+    {
+      capabilities: {
+        tools: {},
+        resources: {},
+        prompts: {}
+      }
     }
-    
-    task.completed = true;
-    task.completed_at = new Date().toISOString();
-    tasksDb.set(task_id, task);
-    
-    return {
-      content: [{ type: "text", text: JSON.stringify(task, null, 2) }],
-    };
-  });
+  );
 
-  // Register list_tasks tool
-  server.tool('list_tasks', 'List all tasks', {}, async () => {
-    const tasks = Array.from(tasksDb.values());
-    return {
-      content: [{ type: "text", text: JSON.stringify(tasks, null, 2) }],
-    };
-  });
-
-  // Register health_check tool
-  server.tool('health_check', 'Perform a health check of the server', {}, async () => {
-    const healthResponse: HealthCheckResponse = {
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      server: "MCP Server (Express + Streamable HTTP)",
-      tasks_count: tasksDb.size,
-      auth_enabled: isAuthEnabled(),
-    };
-    
-    return {
-      content: [{ type: "text", text: JSON.stringify(healthResponse, null, 2) }],
-    };
-  });
-
-  // Register resources
-  server.registerResource('all-tasks', 'tasks://all', {
-    name: "All Tasks",
-    description: "Get all tasks as JSON",
-    mimeType: "application/json",
-  }, async () => {
-    const tasks = Array.from(tasksDb.values());
-    return {
-      contents: [
-        {
-          uri: "tasks://all",
-          mimeType: "application/json",
-          text: JSON.stringify(tasks, null, 2),
-        },
-      ],
-    };
-  });
-
-  server.registerResource('pending-tasks', 'tasks://pending', {
-    name: "Pending Tasks", 
-    description: "Get pending tasks as JSON",
-    mimeType: "application/json",
-  }, async () => {
-    const tasks = Array.from(tasksDb.values()).filter(task => !task.completed);
-    return {
-      contents: [
-        {
-          uri: "tasks://pending",
-          mimeType: "application/json",
-          text: JSON.stringify(tasks, null, 2),
-        },
-      ],
-    };
-  });
-
-  server.registerResource('completed-tasks', 'tasks://completed', {
-    name: "Completed Tasks",
-    description: "Get completed tasks as JSON", 
-    mimeType: "application/json",
-  }, async () => {
-    const tasks = Array.from(tasksDb.values()).filter(task => task.completed);
-    return {
-      contents: [
-        {
-          uri: "tasks://completed",
-          mimeType: "application/json",
-          text: JSON.stringify(tasks, null, 2),
-        },
-      ],
-    };
-  });
-
-  // Register task planning prompt
-  server.registerPrompt('task_planning', {
-    description: "Generate a task planning prompt",
-    argsSchema: {
-      project: z.string().describe('Project name'),
-      deadline: z.string().optional().describe('Project deadline'),
-    },
-  }, async ({ project, deadline = "no specific deadline" }) => {
-    return {
-      messages: [
-        {
-          role: "user" as const,
-          content: {
-            type: "text",
-            text: `You are a project management expert. Create a detailed task breakdown for the project '${project}' with deadline: ${deadline}. Include priorities and estimated time for each task.`,
-          },
-        },
-      ],
-    };
-  });
+  // Register tools
+  if (tools?.length) {
+    for (const tool of tools) {
+      server.tool(tool.name as string, tool.description as string, tool.args || {}, tool.handle as () => Promise<CallToolResult>);
+    }
+  }
 
   return server;
 };
@@ -186,10 +54,12 @@ const MCP_PORT = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT, 10) : 300
 const app = express();
 
 app.use(express.json());
-app.use(cors({
-  origin: '*',
-  exposedHeaders: ["Mcp-Session-Id"]
-}));
+app.use(
+  cors({
+    origin: '*',
+    exposedHeaders: ['Mcp-Session-Id']
+  })
+);
 
 // Authentication middleware
 app.use((req, res, next) => {
@@ -203,8 +73,8 @@ app.use((req, res, next) => {
 
   if (!isAuthenticated) {
     return res.status(401).json({
-      error: "Unauthorized",
-      message: "Valid Bearer token required"
+      error: 'Unauthorized',
+      message: 'Valid Bearer token required'
     });
   }
 
@@ -261,9 +131,9 @@ app.post('/mcp', async (req, res) => {
         jsonrpc: '2.0',
         error: {
           code: -32000,
-          message: 'Bad Request: No valid session ID provided',
+          message: 'Bad Request: No valid session ID provided'
         },
-        id: null,
+        id: null
       });
     }
 
@@ -276,9 +146,9 @@ app.post('/mcp', async (req, res) => {
         jsonrpc: '2.0',
         error: {
           code: -32603,
-          message: 'Internal server error',
+          message: 'Internal server error'
         },
-        id: null,
+        id: null
       });
     }
   }
@@ -324,7 +194,7 @@ const port = MCP_PORT;
 app.listen(port, host, () => {
   console.log(`🚀 MCP Streamable HTTP Server (Express) running on http://${host}:${port}`);
   console.log(`🔐 Authentication: ${isAuthEnabled() ? 'ENABLED' : 'DISABLED'}`);
-  
+
   if (isAuthEnabled()) {
     console.log('ℹ️  Use Authorization: Bearer <TOKEN> header to authenticate');
   }
